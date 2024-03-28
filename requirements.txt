@@ -1,0 +1,14 @@
+numpy
+fire
+transformers>=4.36.0
+torch==2.0.1
+sentencepiece
+tokenizers==0.12.1
+wandb
+accelerate
+deepspeed
+accelerate
+evaluate
+tqdm
+wandb
+vllm
