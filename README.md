@@ -3,6 +3,25 @@
 This repo contains the code and data for "[How Do Humans Write Code? Large Models Do It the Same Way Too]"
 
 # How to Use
+How to test the probability of CoT (Chain of Thought) errors and PoT (Prompt of Thought) errors on various datasets.
+## 
+```bash
+model_path="your model"
+python run_open_pre.py \
+    --model ${model_path} \
+    --shots 0 \
+    --stem_flan_type "pot_prompt" \
+    --batch_size 4 \
+    --dataset "gsm8k" \
+    --model_max_length 1500 \
+    --print \
+    --cot_backup --use_vllm --gpus 2
+```
+How to test in GPT-4-turbo
+```
+cd math_eval
+bash to_gpt.sh
+```
 ## 0. Get Baseline model
 You can download the model from https://huggingface.co/TIGER-Lab/MAmmoTH-Coder-7B and https://huggingface.co/TIGER-Lab/MAmmoTH-7B-Mistral
 ## 1. Get Data
