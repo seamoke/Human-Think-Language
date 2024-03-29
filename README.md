@@ -70,8 +70,8 @@ OMP_NUM_THREADS=12 torchrun --nproc_per_node $WORKER_GPU \
             --deepspeed "ds_config/ds_config_zero3.json" \
 ```
 For PPO stage
+You should get code and environment from https://github.com/jasonvanf/llama-trl. Then replace tuning_lm_with_rl.py.
 ```bash
-cd llama-trl
 bash train_ppo.sh
 ```
 ## 3.Eval
