@@ -47,7 +47,7 @@ torchrun --master_addr ${MASTER_ADDR} \
   --node_rank=${NODE_RANK} \
   train_htl.py \
     --model_name_or_path ${MODEL_PATH} \
-    --data_path "./math_eval/dataset/llama_data/llama_data_final32k.jsonl" \
+    --data_path "./math_eval/dataset/train_llama_data/llama_data_final32k.jsonl" \
     --bf16 True \
     --output_dir ${OUTPUT_PATH} \
     --num_train_epochs 2 \
