@@ -4,12 +4,11 @@ from prompt_utils import get_prompt
 from transformers import GenerationConfig
 from io import StringIO
 from contextlib import redirect_stdout
-import wolframalpha
 import math
 import multiprocessing
+from math import sqrt
 import threading
 from functools import lru_cache
-import openai
 import os
 import torch
 
@@ -395,14 +394,12 @@ def answer_clean(dataset: str, direct_answer_trigger_for_fewshot: tuple, pred: s
 
 
 def get_answer(examples, questions, model, tokenizer, form,
-               max_length: int = 300, do_sample: bool = False,pause=0):
+               max_length: int = 300, do_sample: bool = False):
     prompt_no_input, prefix = get_prompt(examples, form=form)
     prompt_no_input = prompt_no_input
     # Formulate the real prompt
-    if pause:
-        input_strs = [prompt_no_input + prefix.format(query=q)+"<pause>"*pause for q in questions]
-    else:
-        input_strs = [prompt_no_input + prefix.format(query=q) for q in questions]
+    
+    input_strs = [prompt_no_input + prefix.format(query=q) for q in questions]
     batch = tokenizer(
         input_strs,
         padding=True,
@@ -418,7 +415,7 @@ def get_answer(examples, questions, model, tokenizer, form,
         )
     output_strs = []
     for output_id in output_ids.tolist():
-        tmp = tokenizer.decode(output_id[batch.input_ids.shape[-1]:], skip_special_tokens=True)
+        tmp = tokenizer.decode(output_id[batch.input_ids.shape[-1]:], skip_special_tokens=False)
         output_strs.append(tmp)
     for i in range(len(questions)):
         print(input_strs[i])
@@ -431,7 +428,7 @@ PROMPT_COT_TO_POT = {
         "Below is an instruction that describes a task. "
         "Write a response that appropriately completes the request.\n\n"
         "### Instruction:\n{query}\nHere is a mental approach to solve the problem,according to which you can write a program to solve it:\n{cot}\n\n"
-        "Let's write a program.\n### Response:"
+        "Let's write a program.\nLet's write a program.\nLet's write a program.\n### Response:"
     ),
     "prompt_all":(
         "I'd like you to solve this problem in 3 steps:"
@@ -445,7 +442,43 @@ PROMPT_COT_TO_POT = {
         "Below is an instruction that describes a task. "
         "Write a response that appropriately completes the request.\n\n"
     ),
+    'omi_zero_prefix':(
+    "Here are some examples of questions and solutions followed by a new question that you need to solve.\n"
+    "Make sure to put the answer (and only answer) inside \\boxed{}.\n"
+    ),
+    'omi_zero':(
+        "Question:\n{query}\n"
+        "My solution:"
+    )
 }
+
+
+def get_mix_answer(examples, questions, model, tokenizer, form,
+               max_length: int = 300, do_sample: bool = False):
+    prefix = PROMPT_COT_TO_POT['prompt_all']
+    input_strs = [prefix.format(query=q) for q in questions]
+    batch = tokenizer(
+        input_strs,
+        padding=True,
+        return_tensors="pt",
+    )
+    #print(batch)
+    with torch.no_grad():
+        output_ids = model.generate(
+            batch.input_ids.to(model.device),
+            attention_mask=batch.attention_mask.to(model.device),
+            pad_token_id=tokenizer.pad_token_id,
+            generation_config=GenerationConfig(do_sample=do_sample, max_new_tokens=max_length, trust_remote_code=True)
+        )
+    output_strs = []
+    for output_id in output_ids.tolist():
+        tmp = tokenizer.decode(output_id[batch.input_ids.shape[-1]:], skip_special_tokens=False)
+        output_strs.append(tmp)
+    for i in range(len(questions)):
+        print(input_strs[i])
+        print(output_strs[i])
+        print('---------')
+    return output_strs
 
 def get_two_answer(examples, questions, model, tokenizer, form,
                max_length: int = 300, do_sample: bool = False,gpt_prefix = ''):
@@ -455,6 +488,7 @@ def get_two_answer(examples, questions, model, tokenizer, form,
     #     prompt_no_input = prompt_no_input+gpt_prefix
     # print(f'prompt_no_input:{prompt_no_input}')
     # Formulate the real prompt
+
     input_strs = [prompt_no_input+prefix.format(query=q) for q in questions]
     # import pdb 
     # 
@@ -502,38 +536,7 @@ def get_two_answer(examples, questions, model, tokenizer, form,
     #     print('---------')
     return output_strs
 
-def get_gpt_answer(examples, questions, model, tokenizer, form,
-               max_length: int = 300, do_sample: bool = False,gpt_prefix = ''):
-    # prompt_no_input, prefix = get_prompt(examples, form=form)
-    # prompt_no_input = prompt_no_input
-    # if gpt_prefix != '':
-    #     prompt_no_input = prompt_no_input+gpt_prefix
-    # print(f'prompt_no_input:{prompt_no_input}')
-    # Formulate the real prompt
-    prefix,prompt = PROMPT_COT_TO_POT['prefix_all'],PROMPT_COT_TO_POT['prompt_all']
-    prefix+= gpt_prefix
-    input_strs = [prefix+prompt.format(query=q) for q in questions]
-    batch = tokenizer(
-        input_strs,
-        padding=True,
-        return_tensors="pt",
-    )
-    with torch.no_grad():
-        output_ids = model.generate(
-            batch.input_ids.to(model.device),
-            attention_mask=batch.attention_mask.to(model.device),
-            pad_token_id=tokenizer.pad_token_id,
-            generation_config=GenerationConfig(do_sample=do_sample, max_new_tokens=max_length, trust_remote_code=True)
-        )
-    output_strs = []
-    for output_id in output_ids.tolist():
-        tmp = tokenizer.decode(output_id[batch.input_ids.shape[-1]:], skip_special_tokens=True)
-        output_strs.append(tmp)
-    for i in range(len(questions)):
-        print(input_strs[i])
-        print(output_strs[i])
-        print('---------')
-    return output_strs
+
 
 def execute_with_timeout(code: str, timeout: int=5, use_process: bool = True):
     executor = CodeExecutor(code, timeout, use_process)
@@ -559,17 +562,47 @@ def floatify(num: str):
     except Exception:
         return None
 
-
 def number_it(num: str):
-    if 'frac' in num:
+    # if isinstance(num, str) == False:
+    #     return num
+    for x in num:
+        if x == "+":
+            num = num.split("+")
+            # final_ans = None
+            if number_it(num[0]) is None or number_it(num[1]) is None:
+                return None
+            final_ans = 0
+            final_ans = number_it(num[0])
+            final_ans += number_it(num[1])
+            return final_ans
+        elif x == "-":
+            num = num.split("-")
+            # final_ans = None
+            if (number_it(num[0]) is None and num[0] != "") or number_it(
+                    num[1]) is None:
+                return None
+            final_ans = 0
+            if num[0] != "":
+                final_ans = number_it(num[0])
+            final_ans -= number_it(num[1])
+            return final_ans
+
+    if "frac" in num:
         pattern = r"\\frac\{([^{}]+)\}\{([^{}]+)\}"
         num = re.sub(pattern, r"\1/\2", num)
         try:
             num = str(eval(num))
         except Exception:
             pass
-    elif ',' in num:
-        num = num.replace(',', '')
+    elif "," in num:
+        num = num.replace(",", "")
+    elif "sqrt" in num:
+        num_match = re.search(r"\\sqrt{(?P<num>\d+)}", num)
+        if num_match:
+            number = int(num_match.group("num"))
+            # Calculate the square root of the extracted number
+            num = sqrt(number)
+            # print(num)
 
     if floatify(num) is not None:
         return floatify(num)
@@ -598,28 +631,9 @@ def compare_two_numbers(p, gt):
         return False
 
 
-def get_decimal_with_wolfram(string: str) -> float:
-    wolfram_client = wolframalpha.Client('AU7JWQ-QQUV8K8QLQ')
-    for ex in wolfram_client.query(f'compute {string}').pods:
-        if ex['@title'] in ['Decimal approximation', 'Decimal form']:
-            for sub in ex.subpods:
-                try:
-                    return float(sub['plaintext'][:20])
-                except Exception:
-                    pass
-
-    for ex in wolfram_client.query(f'compute {string}').pods:
-        if ex['@title'] in ['Result']:
-            for sub in ex.subpods:
-                try:
-                    return float(sub['plaintext'][:8])
-                except Exception:
-                    pass
-
-    return None
-
 @lru_cache(maxsize=None)
-def compare_both_string_and_number_format(answer, groundtruth_str, groundtruth_num):
+def compare_both_string_and_number_format(answer, groundtruth_str,
+                                          groundtruth_num):
     if answer == groundtruth_str:
         return True
     else:
@@ -631,10 +645,28 @@ def compare_both_string_and_number_format(answer, groundtruth_str, groundtruth_n
         else:
             return False
 
+def match_correct(pred, ans):
+
+    str_num = None
+    ans_str = ""
+    if isinstance(ans, str):
+        ans_str = ans
+        try:
+            str_num = eval(ans)
+        except:
+            str_num = None
+    else:
+        str_num = ans
+        ans_str = str(ans)
+    try:
+        return compare_both_string_and_number_format(pred, ans_str, str_num)
+    except Exception as e:
+        print(e)
+        return False
 
 def process_question_with_flan_tag(questions: list, stem_flan_type: str):
     if stem_flan_type == "pot_prompt":
-        prefix = " Let's write a program."
+        prefix = "Let's write a program."
     elif stem_flan_type == "":
         prefix = ""
     else:
@@ -717,38 +749,3 @@ Thought:"""
     else:
         print('Default the option to A!!!')
         return 'A'
-
-'''
-
-Below are some problems.
-Problem:
-Q: Alannah, Beatrix, and Queen are preparing for the new school year and have been given books
-by their parents. Alannah has 20 more books than Beatrix. Queen has 1/5 times more books than
-Alannah. If Beatrix has 30 books, how many books do the three have together?
-A: <INS>
-Ground truth answer:
-140
-
-Q: Mishka bought 3 pairs of shorts, 3 pairs of pants, and 3 pairs of shoes. One pair of shorts costs $16.50. 
-One pair of pants costs $22.50 and one pair of shoes costs $42. How many dollars did Mishka spend on all the clothing items?
-A: <INS>
-Ground truth answer:
-243
-
-Q: Cynthia eats one serving of ice cream every night.  She buys cartons of ice cream with 15 servings of ice cream 
-per carton at a cost of $4.00 per carton.  After 60 days, how much will she spend on ice cream
-A: <INS>
-Ground truth answer:
-16
-
-Q: Henry made two stops during his 60-mile bike trip. He first stopped after 20 miles. His second stop was 15 
-miles before the end of the trip. How many miles did he travel between his first and second stops
-A: <INS>
-Ground truth answer:
-25
-
-
-Generate an instruction that is different from all the instructions <INS> above, and has a higher score
-than all the instructions <INS> above. The instruction should begin with <INS> and end with </INS>.
-The instruction should be concise, effective, and generally applicable to all problems above.
-'''

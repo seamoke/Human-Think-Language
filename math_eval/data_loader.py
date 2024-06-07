@@ -178,7 +178,7 @@ def data_reader(dataset: str):
         questions = []
         answers = []
         for x in list_data_dict:
-            if 'gsm' in x['source']:
+            if 'CoT/gsm' in x['source'] or 'CoT/MATH' in x['source']:
                 # single_answers = x['output'].split('The answer is')[-1].strip()
                 # single_answers = single_answers.replace('.','')
                 # if single_answers in ['A','B','C','D','E']:
@@ -191,13 +191,13 @@ def data_reader(dataset: str):
                 # print(x['output'])
                 # print('\n')
                 count+=1
-        questions = questions[25000:]
-        answers = answers[25000:]
-        print(len(questions))
-        data_list = list(range(len(questions)))
-        sampled_data = random.sample(data_list, 16000)
-        questions = [questions[x] for x in sampled_data]
-        answers = [answers[x] for x in sampled_data]
+        #questions = questions[0:10]
+        #answers = answers[0:10]
+        # print(len(questions))
+        # data_list = list(range(len(questions)))
+        # sampled_data = random.sample(data_list, 16000)
+        # questions = [questions[x] for x in sampled_data]
+        # answers = [answers[x] for x in sampled_data]
         print(len(questions))
         # import datasets
         # list_data_dict = datasets.load_dataset(path='gsm8k',name='main')['train']
@@ -288,39 +288,41 @@ def get_sample_data(dataset,optimizer_sample):
     return data_list
 
 class BatchDatasetLoader:
-    def __init__(self, dataset: str, batch_size: int,optimizer_sample: int = 0):
+    def __init__(self, dataset: str, batch_size: int):
         self.inputs, self.outputs = data_reader(dataset)
-        if optimizer_sample != 0 :
-            # data_list = list(range(len(self.outputs)))
-            # sampled_data = random.sample(data_list, optimizer_sample)
-            # self.inputs = [self.inputs[x] for x in sampled_data]
-            # self.outputs = [self.outputs[x] for x in sampled_data]
-            self.inputs = self.inputs[0:optimizer_sample]
-            self.outputs = self.outputs[0:optimizer_sample]
         self.index = 0
         self.batch_size = batch_size
         self.length = len(self.inputs)
         print(self.length, self.batch_size)
 
     def __len__(self):
-        return self.length // self.batch_size
+        if self.batch_size == -1:
+            return 1
+        else:
+            return self.length // self.batch_size
 
     def __getitem__(self, index):
-        if self.length % self.batch_size == 0:
+        if self.batch_size == -1:
             if index >= self.__len__():
                 raise StopIteration
             else:
-                tmp_inputs, tmp_outputs = [], []
-                for i in range(index * self.batch_size, min((index + 1) * self.batch_size, self.length)):
-                    tmp_inputs.append(self.inputs[i])
-                    tmp_outputs.append(self.outputs[i])
-                return tmp_inputs, tmp_outputs
+                return self.inputs, self.outputs
         else:
-            if index > self.__len__():
-                raise StopIteration
+            if self.length % self.batch_size == 0:
+                if index >= self.__len__():
+                    raise StopIteration
+                else:
+                    tmp_inputs, tmp_outputs = [], []
+                    for i in range(index * self.batch_size, min((index + 1) * self.batch_size, self.length)):
+                        tmp_inputs.append(self.inputs[i])
+                        tmp_outputs.append(self.outputs[i])
+                    return tmp_inputs, tmp_outputs
             else:
-                tmp_inputs, tmp_outputs = [], []
-                for i in range(index * self.batch_size, min((index + 1) * self.batch_size, self.length)):
-                    tmp_inputs.append(self.inputs[i])
-                    tmp_outputs.append(self.outputs[i])
-                return tmp_inputs, tmp_outputs
+                if index > self.__len__():
+                    raise StopIteration
+                else:
+                    tmp_inputs, tmp_outputs = [], []
+                    for i in range(index * self.batch_size, min((index + 1) * self.batch_size, self.length)):
+                        tmp_inputs.append(self.inputs[i])
+                        tmp_outputs.append(self.outputs[i])
+                    return tmp_inputs, tmp_outputs
