@@ -1,6 +1,6 @@
 
 # **Human Think Language** 
-This repo contains the code and data for "How Do Humans Write Code? Large Models Do It the Same Way Too"
+This repo contains the code and data for "[How Do Humans Write Code? Large Models Do It the Same Way Too](https://arxiv.org/pdf/2402.15729)"
 
 ## **Installation**
 
