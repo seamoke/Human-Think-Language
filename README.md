@@ -1,8 +1,18 @@
 
 # **Human Think Language** 
-This repo contains the code and data for "[How Do Humans Write Code? Large Models Do It the Same Way Too]"
+This repo contains the code and data for "How Do Humans Write Code? Large Models Do It the Same Way Too"
 
-# How to Use
+## **Installation**
+
+Clone this repository and install the required packages:
+
+```bash
+git clone https://github.com/seamoke/Human-Think-Language.git
+cd Human-Think-Language
+pip install -r requirements.txt
+```
+
+## **How to Use**
 How to test the probability of CoT (Chain of Thought) errors and PoT (Prompt of Thought) errors on various datasets.
 ```bash
 cd math_eval
@@ -99,37 +109,54 @@ bash train_ppo.sh
 cd math_eval
 ```
 ```bash
-dataset="deepmind"
-#dataset=("gsm8k" "svamp" "numglue" "simuleq")
-model_path="your model"
-echo ${model_path}
-echo ${dataset[$i]}
-python run_test_open.py \
---model ${model_path} \
---shots 0 \
---stem_flan_type "pot_prompt" \
---batch_size 4 \
---dataset ${dataset} \
---model_max_length 1500 \
---print \
---cot_backup 
+dataset=('gsm8k' 'svamp' 'math')
+export TOKENIZERS_PARALLELISM=true
+export CUDA_DEVICE_ORDER="PCI_BUS_ID"
+
+for str in  "htl_model"
+do
+  model_path=${str}
+  #model_path="${model_base}${str}"
+  echo $model_path
+
+  for i in ${dataset[@]}
+  do
+    python run_open_htl.py \
+    --model $model_path \
+    --shots 0 \
+    --stem_flan_type "pot_prompt" \
+    --batch_size 8 \
+    --dataset ${i} \
+    --model_max_length 3072 \
+    --cot_backup \
+    --print
+  done
+done
 ```
 if you want to use vllm
 ```bash
-dataset="deepmind"
-#dataset=("gsm8k" "svamp" "numglue" "simuleq")
-model_path="your model"
-echo ${model_path}
-echo ${dataset[$i]}
-python run_test_open.py \
---model ${model_path} \
---shots 0 \
---stem_flan_type "pot_prompt" \
---batch_size 4 \
---dataset ${dataset} \
---model_max_length 1500 \
---print \
---cot_backup 
---use_vllm --gpus 8
+dataset=('gsm8k' 'svamp' 'math')
+export TOKENIZERS_PARALLELISM=true
+export CUDA_DEVICE_ORDER="PCI_BUS_ID"
 
+for str in  "htl_model"
+do
+  model_path=${str}
+  #model_path="${model_base}${str}"
+  echo $model_path
+
+  for i in ${dataset[@]}
+  do
+    python run_open_htl.py \
+    --model $model_path \
+    --shots 0 \
+    --stem_flan_type "pot_prompt" \
+    --batch_size 8 \
+    --dataset ${i} \
+    --model_max_length 3072 \
+    --cot_backup \
+    --print \
+    --use_vllm
+  done
+done
 ```

@@ -325,7 +325,6 @@ def train():
             cache_dir=training_args.cache_dir,
             torch_dtype=torch.bfloat16,
             attn_implementation="flash_attention_2",
-            use_cache=False,
         ).to('cuda')
     else:
         model = LlamaForCausalLM.from_pretrained(
@@ -334,11 +333,6 @@ def train():
             torch_dtype=torch.bfloat16,
             attn_implementation='eager',
         ).to('cuda')
-        # model = transformers.AutoModelForCausalLM.from_pretrained(
-        #     model_args.model_name_or_path,
-        #     cache_dir=training_args.cache_dir,
-        #     #attn_implementation='eager'
-        # ).to('cuda')
     print(model)
     print('Start building tokenizer')
     tokenizer = transformers.AutoTokenizer.from_pretrained(
